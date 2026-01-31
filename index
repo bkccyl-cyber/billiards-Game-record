@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>撞球專業計分系統 V4.4 (Trophy Resized)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #020617; color: white; overflow: hidden; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; height: 100vh; }
+        .score-font { font-family: 'Impact', 'Arial Black', sans-serif; font-size: 42vh; line-height: 0.8; flex-grow: 1; display: flex; align-items: center; justify-content: center; }
+        .on-the-hill { color: #facc15 !important; text-shadow: 0 0 60px rgba(250, 204, 21, 0.8); }
+        .neon-title { position: absolute; top: 2vh; left: 50%; transform: translateX(-50%); font-size: 3rem; font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: 0.2em; color: #60a5fa; text-shadow: 0 0 10px rgba(59, 130, 246, 0.8); z-index: 100; white-space: nowrap; }
+        .overlay-bg { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 400; padding: 2rem; backdrop-filter: blur(10px); }
+        .mode-btn { background: rgba(30, 41, 59, 0.7); border: 2px solid #3b82f6; padding: 1.5rem; border-radius: 1.5rem; text-align: center; transition: 0.2s; cursor: pointer; width: 100%; font-weight: 900; font-size: 2rem; color: white; }
+        .mode-btn:hover { background: #3b82f6; transform: scale(1.03); }
+        .center-race-bar { background: rgba(15, 23, 42, 0.95); border: 3px solid #3b82f6; padding: 0.8rem 2.5rem; border-radius: 2.5rem; text-align: center; box-shadow: 0 0 40px rgba(59, 130, 246, 0.4); min-width: 220px; position: relative; }
+        .control-row { display: flex; gap: 1.2rem; width: 100%; height: 13vh; padding: 0 2rem; margin-bottom: 2.5rem; }
+        .plus-btn { flex: 5; border-radius: 1.5rem; font-size: 4.5rem; font-weight: 900; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .minus-btn { flex: 1.2; border-radius: 1.5rem; font-size: 2.5rem; font-weight: 900; display: flex; align-items: center; justify-content: center; background: #1e293b; border: 2px solid #334155; color: #94a3b8; cursor: pointer; }
+        .win-tag { font-size: 1.1rem; color: #facc15; font-weight: 900; background: rgba(30, 41, 59, 0.9); padding: 4px 12px; border-radius: 8px; margin-left: 10px; border: 1px solid rgba(250, 204, 21, 0.3); }
+        .race-btn { border: 2px solid #3b82f6; padding: 0.5rem 1.5rem; border-radius: 0.75rem; font-weight: 900; color: #60a5fa; transition: 0.2s; }
+        .race-btn.active { background: #3b82f6; color: white; }
+        .last-winner-chip { background: #ef4444; color: white; padding: 6px 18px; border-radius: 50px; font-size: 1rem; font-weight: 900; white-space: nowrap; }
+        .fullscreen-setting-btn { position: absolute; top: 2rem; right: 2rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #60a5fa; padding: 0.6rem 1.2rem; border-radius: 0.5rem; font-weight: bold; cursor: pointer; z-index: 501; }
+        
+        /* ★★★ 修改：懸浮獎盃樣式 (縮小並拉長) ★★★ */
+        .big-trophy {
+            position: absolute;
+            top: 50%;
+            /* 1. 縮小基礎大小 (原本 10rem -> 現在 6rem, 約60%) */
+            font-size: 6rem; 
+            filter: drop-shadow(0 0 30px rgba(234, 179, 8, 0.6));
+            z-index: 50;
+            opacity: 0;
+            /* 初始狀態：垂直置中，稍微縮小一點以便產生彈跳感 */
+            transform: translateY(-50%) scale(0.8, 1);
+            transition: opacity 0.5s ease-in-out, transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .big-trophy.show {
+            opacity: 1;
+            /* 2. 顯示狀態：垂直置中，寬度正常(1)，高度拉長20%(1.2) */
+            transform: translateY(-50%) scale(1, 1.2);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen relative">
+    <div id="gameModeIndicator" class="neon-title">模式選擇</div>
+
+    <div id="modeOverlay" class="overlay-bg">
+        <button onclick="toggleFullScreen()" class="fullscreen-setting-btn">全螢幕切換</button>
+        <h2 class="text-5xl font-black mb-12 italic text-blue-400 uppercase">請選擇比賽模式</h2>
+        <div class="grid grid-cols-2 gap-8 w-full max-w-4xl px-4">
+            <button onclick="selectMode('平點賽')" class="mode-btn">平點賽</button>
+            <button onclick="selectMode('讓局賽')" class="mode-btn border-emerald-500 text-emerald-400">讓局賽</button>
+            <button onclick="selectMode('雙殺降局賽')" class="mode-btn border-purple-500 text-purple-400">雙殺降局賽</button>
+            <button onclick="selectMode('擂台賽')" class="mode-btn border-red-500 text-red-400">擂台賽</button>
+            <button onclick="selectMode('3-3-1 驟死賽')" class="mode-btn border-orange-500 text-orange-400 col-span-2">3-3-1 驟死賽</button>
+        </div>
+    </div>
+
+    <div id="playerOverlay" class="overlay-bg" style="display: none;">
+        <button onclick="toggleFullScreen()" class="fullscreen-setting-btn">全螢幕切換</button>
+        <h2 id="currentModeTitle" class="text-3xl font-black mb-10 text-yellow-500 italic">模式</h2>
+        <div class="flex flex-col md:flex-row items-center gap-10 mb-14">
+            <div class="flex flex-col gap-4 bg-slate-900/60 p-6 rounded-[2rem] border border-blue-500/30">
+                <select id="gradeA" onchange="updateNameList('A')" class="bg-slate-800 p-3 rounded-xl text-xl w-64 text-white font-bold"></select>
+                <select id="selectA" class="bg-slate-800 border-2 border-blue-500 p-4 rounded-xl text-2xl w-64 text-blue-400 font-bold"></select>
+            </div>
+            <div class="text-5xl font-black text-slate-800 italic">VS</div>
+            <div class="flex flex-col gap-4 bg-slate-900/60 p-6 rounded-[2rem] border border-red-500/30">
+                <select id="gradeB" onchange="updateNameList('B')" class="bg-slate-800 p-3 rounded-xl text-xl w-64 text-white font-bold"></select>
+                <select id="selectB" class="bg-slate-800 border-2 border-red-500 p-4 rounded-xl text-2xl w-64 text-red-500 font-bold"></select>
+            </div>
+        </div>
+        <button id="startBtn" onclick="checkMatchHistory()" class="bg-blue-600 text-white px-20 py-5 rounded-full text-3xl font-black italic">載入選手資料</button>
+    </div>
+
+    <div id="previewOverlay" class="overlay-bg" style="display: none;">
+        <div class="bg-slate-900/90 border-2 border-blue-500 p-10 rounded-[3rem] text-center max-w-4xl w-full">
+            <div class="mb-6 flex justify-center gap-3">
+                <span id="welcomeLabel" class="welcome-chip hidden">👋 初次對決！</span>
+                <span id="preLastWinnerArea" class="last-winner-chip hidden">🔥 前場勝方：<span id="preLastWinnerName"></span></span>
+            </div>
+            <div id="customRaceArea" class="mb-10 p-6 bg-blue-900/20 rounded-2xl border border-blue-500/30 hidden">
+                <p class="text-yellow-500 font-bold mb-4 italic">高手對決：請選擇比賽局數</p>
+                <div class="flex justify-center gap-4">
+                    <button onclick="setCustomRace(3)" class="race-btn" id="race3">搶 3</button>
+                    <button onclick="setCustomRace(5)" class="race-btn active" id="race5">搶 5</button>
+                    <button onclick="setCustomRace(7)" class="race-btn" id="race7">搶 7</button>
+                    <button onclick="setCustomRace(9)" class="race-btn" id="race9">搶 9</button>
+                </div>
+            </div>
+            <div class="flex justify-around items-center mb-10">
+                <div class="text-center"><div id="preNameA" class="text-4xl font-black"></div><div id="preStatsA" class="text-emerald-400 text-xl font-bold mt-2"></div></div>
+                <div class="text-3xl italic font-black text-slate-700">VS</div>
+                <div class="text-center"><div id="preNameB" class="text-4xl font-black"></div><div id="preStatsB" class="text-emerald-400 text-xl font-bold mt-2"></div></div>
+            </div>
+            <button id="confirmBtn" onclick="confirmStart()" class="w-full bg-blue-600 py-6 rounded-2xl font-black text-3xl italic">確認開始比賽</button>
+        </div>
+    </div>
+
+    <div id="setWinOverlay" class="overlay-bg" style="display: none; z-index: 550; background: rgba(2, 6, 23, 0.85);">
+        <div class="text-6xl animate-bounce mb-6">✨</div>
+        <h2 id="setWinTitle" class="text-5xl font-black text-yellow-400 italic mb-4 uppercase">Set Won!</h2>
+        <div id="setWinMsg" class="text-3xl text-white font-bold mb-10 text-center leading-relaxed"></div>
+        <button onclick="nextSetAction()" class="bg-blue-600 hover:bg-blue-500 text-white px-16 py-5 rounded-full text-2xl font-black italic shadow-lg active:scale-95 transition-all">
+            下一盤開始
+        </button>
+    </div>
+
+    <div class="h-[10vh] flex items-center justify-between px-10 z-20">
+        <button onclick="resetGame()" class="text-slate-600 font-bold uppercase text-xs">重新選擇</button>
+        <button id="mainSaveBtn" onclick="saveProgress()" class="text-emerald-400 font-bold border border-emerald-500/40 px-4 py-1.5 rounded-lg text-xs">儲存目前進度</button>
+    </div>
+
+    <div class="center-info-area" style="position: absolute; left: 50%; top: 55%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; z-index: 10;">
+        <div id="boardLastWinnerArea" class="hidden mb-4"><span class="last-winner-chip">🔥 前場勝方：<span id="boardLastWinnerName"></span></span></div>
+        <div class="center-race-bar">
+            <div class="text-slate-500 text-[10px] font-bold uppercase mb-1">目標局數</div>
+            <div id="raceDisplay" class="text-5xl font-black text-blue-500 italic">5</div>
+        </div>
+    </div>
+
+    <div class="flex-grow flex overflow-hidden">
+        <div class="flex-1 flex flex-col border-r border-slate-900/50 relative"> 
+            <div id="trophyA" class="big-trophy left-8">🏆</div>
+            <div class="flex flex-col items-center mt-10">
+                <div class="flex items-center gap-3"> 
+                    <span id="displayNameA" class="text-5xl font-black text-blue-400 uppercase">選手 A</span>
+                    <span id="sideStatA" class="win-tag">0 勝</span>
+                </div>
+                <div id="adjLabelA" class="text-xs text-slate-500 font-bold mt-1"></div>
+            </div>
+            <div id="scoreA" class="score-font select-none">0</div>
+            <div class="control-row"><button onclick="changeScore('A', -1)" class="minus-btn">-</button><button onclick="changeScore('A', 1)" class="plus-btn bg-blue-600 text-white">+</button></div>
+        </div>
+
+        <div class="flex-1 flex flex-col relative"> 
+            <div id="trophyB" class="big-trophy right-8">🏆</div>
+            <div class="flex flex-col items-center mt-10">
+                <div class="flex items-center gap-3">
+                    <span id="displayNameB" class="text-5xl font-black text-red-500 uppercase">選手 B</span>
+                    <span id="sideStatB" class="win-tag">0 勝</span>
+                </div>
+                <div id="adjLabelB" class="text-xs text-slate-500 font-bold mt-1"></div>
+            </div>
+            <div id="scoreB" class="score-font select-none">0</div>
+            <div class="control-row"><button onclick="changeScore('B', 1)" class="plus-btn bg-red-600 text-white">+</button><button onclick="changeScore('B', -1)" class="minus-btn">-</button></div>
+        </div>
+    </div>
+
+    <div id="winOverlay" class="overlay-bg" style="display:none; z-index: 600; backdrop-filter: blur(20px);">
+        <div class="text-[15rem] mb-8 animate-bounce">🏆</div>
+        <h2 class="text-5xl font-black text-yellow-500 uppercase italic tracking-widest mb-4">Champion</h2>
+        <h1 id="winnerLabel" class="text-8xl font-black text-white uppercase italic text-center drop-shadow-[0_0_30px_rgba(255,255,255,0.5)] mb-10">選手姓名</h1>
+        <button onclick="resetGame()" class="mt-8 bg-yellow-600 hover:bg-yellow-500 text-white px-24 py-6 rounded-full font-black text-3xl italic shadow-2xl active:scale-95 transition-all">
+            下一場對決
+        </button>
+    </div>
+
+    <script>
+        // ★★★ 請確認此網址正確 ★★★
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbwF5Xm1mZqHl9X0gYiPMx8rfrm9g-w0Ob9iSd_0n7DyRh-p1UwFHxmZGFMGNswJvgIZ/exec"; 
+        
+        let scoreA = 0, scoreB = 0, raceGoalA = 5, raceGoalB = 5;
+        let playerList = [], currentHistory = {aWin:0, bWin:0}, currentHandicaps = {adjA:0, adjB:0}, lastWinnerName = "", selectedCustomRace = 5, currentMode = "", savedData = null;
+        let serverRecRace = 3;
+        let currentSetScore = {a: 0, b: 0};
+        let pendingSetWinner = null; 
+
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(e => console.log(e.message));
+            else if (document.exitFullscreen) document.exitFullscreen();
+        }
+
+        function resetGame() {
+            document.getElementById('winOverlay').style.display = 'none';
+            document.getElementById('setWinOverlay').style.display = 'none';
+            document.getElementById('previewOverlay').style.display = 'none';
+            document.getElementById('playerOverlay').style.display = 'none';
+            document.getElementById('modeOverlay').style.display = 'flex';
+            document.getElementById('gameModeIndicator').innerText = "模式選擇";
+            document.getElementById('boardLastWinnerArea').classList.add('hidden');
+            
+            document.getElementById('trophyA').classList.remove('show');
+            document.getElementById('trophyB').classList.remove('show');
+            document.getElementById('raceDisplay').classList.remove('text-red-600', 'animate-pulse');
+            document.getElementById('raceDisplay').classList.add('text-blue-500');
+
+            scoreA = 0; scoreB = 0; savedData = null; 
+            currentSetScore = {a: 0, b: 0}; 
+            updateVisuals();
+        }
+
+        async function fetchPlayers() {
+            try {
+                document.getElementById('startBtn').innerText = "連線中...";
+                const response = await fetch(GAS_URL);
+                if (!response.ok) throw new Error("連線失敗");
+                let text = await response.text();
+                try { playerList = JSON.parse(text); } catch(e) { throw new Error("資料格式錯誤"); }
+                if (!playerList || playerList.length === 0) throw new Error("讀不到選手資料");
+                
+                const grades = [...new Set(playerList.map(p => p.年級))].filter(g => g).sort();
+                ['gradeA', 'gradeB'].forEach(id => {
+                    const sel = document.getElementById(id); sel.innerHTML = '<option value="">選擇年級</option>';
+                    grades.forEach(g => { let opt = document.createElement('option'); opt.value = g; opt.text = g; sel.appendChild(opt); });
+                });
+                document.getElementById('startBtn').innerText = "載入選手資料";
+            } catch (e) { 
+                console.error(e); alert("連線發生錯誤：" + e.message);
+                document.getElementById('startBtn').innerText = "讀取失敗";
+            }
+        }
+
+        function updateNameList(side) {
+            const grade = document.getElementById('grade' + side).value;
+            const sel = document.getElementById('select' + side);
+            sel.innerHTML = '<option value="">選擇選手</option>';
+            playerList.filter(p => String(p.年級) === String(grade)).forEach(p => {
+                let opt = document.createElement('option'); 
+                opt.value = p.選手姓名; 
+                opt.text = `${p.選手姓名} (${p.目前等級})`; 
+                sel.appendChild(opt);
+            });
+        }
+
+        function selectMode(mode) {
+            currentMode = mode;
+            document.getElementById('currentModeTitle').innerText = mode;
+            document.getElementById('gameModeIndicator').innerText = mode;
+            document.getElementById('modeOverlay').style.display = 'none';
+            document.getElementById('playerOverlay').style.display = 'flex';
+            fetchPlayers();
+        }
+
+        function setCustomRace(val) {
+            selectedCustomRace = val;
+            [3, 5, 7, 9].forEach(r => document.getElementById('race' + r).classList.toggle('active', r === val));
+        }
+
+        async function checkMatchHistory() {
+            const pA = document.getElementById('selectA').value;
+            const pB = document.getElementById('selectB').value;
+            if (!pA || !pB || pA === pB) return alert("請正確選擇選手");
+            document.getElementById('startBtn').innerText = "載入中...";
+            
+            try {
+                const resp = await fetch(`${GAS_URL}?action=load&pA=${encodeURIComponent(pA)}&pB=${encodeURIComponent(pB)}&mode=${encodeURIComponent(currentMode)}`);
+                const result = await resp.json();
+                
+                currentHistory = result.history; 
+                currentHandicaps = result.adjs; 
+                lastWinnerName = result.lastWinner; 
+                savedData = result.save;
+                serverRecRace = result.recRace || 3;
+                currentSetScore = result.setScore || {a: 0, b: 0};
+
+                const dataA = playerList.find(x => x.選手姓名 === pA);
+                const dataB = playerList.find(x => x.選手姓名 === pB);
+                
+                document.getElementById('welcomeLabel').classList.toggle('hidden', (currentHistory.aWin + currentHistory.bWin > 0));
+                document.getElementById('preLastWinnerArea').classList.toggle('hidden', !lastWinnerName);
+                if(lastWinnerName) document.getElementById('preLastWinnerName').innerText = lastWinnerName;
+                
+                // 平點賽且都是高手才顯示自訂局數
+                if (currentMode === '平點賽' && ['S','教練','家長'].includes(dataA.目前等級) && ['S','教練','家長'].includes(dataB.目前等級)) {
+                    document.getElementById('customRaceArea').classList.remove('hidden');
+                } else { document.getElementById('customRaceArea').classList.add('hidden'); }
+                
+                document.getElementById('preNameA').innerText = pA; document.getElementById('preNameB').innerText = pB;
+                document.getElementById('preStatsA').innerText = `${currentHistory.aWin} 勝`; document.getElementById('preStatsB').innerText = `${currentHistory.bWin} 勝`;
+                
+                if (savedData) {
+                    document.getElementById('confirmBtn').innerText = `偵測到存檔，點擊繼續`;
+                    document.getElementById('confirmBtn').classList.replace('bg-blue-600', 'bg-emerald-600');
+                } else {
+                    if (currentMode === '3-3-1 驟死賽') {
+                        if(currentSetScore.a === 1 && currentSetScore.b === 1) document.getElementById('confirmBtn').innerText = `確認開始 (驟死賽 搶1)`;
+                        else document.getElementById('confirmBtn').innerText = `確認開始 (搶3)`;
+                    } else {
+                        document.getElementById('confirmBtn').innerText = `確認開始比賽`;
+                    }
+                    document.getElementById('confirmBtn').classList.replace('bg-emerald-600', 'bg-blue-600');
+                }
+                document.getElementById('previewOverlay').style.display = 'flex';
+                document.getElementById('startBtn').innerText = "載入選手資料";
+            } catch (e) {
+                alert("載入歷史失敗：" + e.message);
+                document.getElementById('startBtn').innerText = "重試";
+            }
+        }
+
+        function confirmStart() {
+            const pA = document.getElementById('preNameA').innerText;
+            const pB = document.getElementById('preNameB').innerText;
+            const dataA = playerList.find(x => x.選手姓名 === pA);
+            const dataB = playerList.find(x => x.選手姓名 === pB);
+
+            // 清除視覺
+            document.getElementById('trophyA').classList.remove('show');
+            document.getElementById('trophyB').classList.remove('show');
+            document.getElementById('raceDisplay').classList.remove('text-red-600', 'animate-pulse');
+            document.getElementById('raceDisplay').classList.add('text-blue-500');
+
+            if (savedData) {
+                // --- 存檔讀取模式 ---
+                let s = savedData.score.split(':');
+                if (savedData.savedP1 === pA) { scoreA = Number(s[0]); scoreB = Number(s[1]); } 
+                else { scoreA = Number(s[1]); scoreB = Number(s[0]); }
+
+                // 根據模式設定 (修復：即使有存檔，讓局賽也強制重算等級)
+                if (currentMode === '雙殺降局賽') {
+                    // 雙殺依照最新的 adj 計算
+                    raceGoalA = Math.min(5, Math.max(3, 5 + (Number(currentHandicaps.adjA) || 0)));
+                    raceGoalB = Math.min(5, Math.max(3, 5 + (Number(currentHandicaps.adjB) || 0)));
+
+                } else if (currentMode === '讓局賽') {
+                    // ★★★ 修正點：存檔時也強制依等級重算 (S=5, A=4...) ★★★
+                    const gA = (dataA.目前等級 || "").toString().trim().toUpperCase();
+                    const gB = (dataB.目前等級 || "").toString().trim().toUpperCase();
+                    const gradeMap = { 'S': 5, 'A': 4, 'B': 3, 'C': 3 };
+                    raceGoalA = gradeMap[gA] !== undefined ? gradeMap[gA] : 5;
+                    raceGoalB = gradeMap[gB] !== undefined ? gradeMap[gB] : 5;
+
+                } else if (savedData.raceA) { 
+                    raceGoalA = Number(savedData.raceA); raceGoalB = Number(savedData.raceB); 
+                } else { 
+                    raceGoalA = 5; raceGoalB = 5; 
+                }
+            } else {
+                // --- 新比賽模式 ---
+                scoreA = 0; scoreB = 0;
+                
+                if (currentMode === '雙殺降局賽') {
+                    // ★ 雙殺：依照後端回傳的 Adj 動態調整
+                    raceGoalA = Math.min(5, Math.max(3, 5 + (Number(currentHandicaps.adjA) || 0)));
+                    raceGoalB = Math.min(5, Math.max(3, 5 + (Number(currentHandicaps.adjB) || 0)));
+                
+                } else if (currentMode === '讓局賽') {
+                    const gA = (dataA.目前等級 || "").toString().trim().toUpperCase();
+                    const gB = (dataB.目前等級 || "").toString().trim().toUpperCase();
+                    const gradeMap = { 'S': 5, 'A': 4, 'B': 3, 'C': 3 };
+                    raceGoalA = gradeMap[gA] !== undefined ? gradeMap[gA] : 5;
+                    raceGoalB = gradeMap[gB] !== undefined ? gradeMap[gB] : 5;
+
+                } else if (currentMode === '3-3-1 驟死賽') {
+                    if (currentSetScore.a === 1 && currentSetScore.b === 1) { raceGoalA = 1; raceGoalB = 1; } 
+                    else { raceGoalA = 3; raceGoalB = 3; }
+                
+                } else if (currentMode === '平點賽') { 
+                    raceGoalA = raceGoalB = selectedCustomRace; 
+                
+                } else { 
+                    raceGoalA = raceGoalB = 5; 
+                }
+            }
+
+            document.getElementById('displayNameA').innerText = pA; 
+            document.getElementById('displayNameB').innerText = pB;
+            document.getElementById('sideStatA').innerText = `${currentHistory.aWin} 勝`;
+            document.getElementById('sideStatB').innerText = `${currentHistory.bWin} 勝`;
+            document.getElementById('raceDisplay').innerText = (raceGoalA === raceGoalB) ? raceGoalA : `${raceGoalA} : ${raceGoalB}`;
+            
+            if (lastWinnerName) {
+                document.getElementById('boardLastWinnerName').innerText = lastWinnerName;
+                document.getElementById('boardLastWinnerArea').classList.remove('hidden');
+            } else {
+                document.getElementById('boardLastWinnerArea').classList.add('hidden');
+            }
+
+            // 3-3-1 視覺還原
+            if (currentMode === '3-3-1 驟死賽') {
+                if (currentSetScore.a > 0) document.getElementById('trophyA').classList.add('show');
+                if (currentSetScore.b > 0) document.getElementById('trophyB').classList.add('show');
+                
+                if (raceGoalA === 1) {
+                    document.getElementById('raceDisplay').classList.remove('text-blue-500');
+                    document.getElementById('raceDisplay').classList.add('text-red-600', 'animate-pulse');
+                }
+            }
+
+            updateVisuals(); 
+            document.getElementById('previewOverlay').style.display = 'none';
+            document.getElementById('playerOverlay').style.display = 'none';
+        }
+
+        function changeScore(p, v) {
+            if (p === 'A') scoreA = Math.max(0, scoreA + v); else scoreB = Math.max(0, scoreB + v);
+            updateVisuals();
+            
+            if (scoreA >= raceGoalA) {
+                if (currentMode === '3-3-1 驟死賽') handleSetWin('A');
+                else showWinner(document.getElementById('displayNameA').innerText);
+            }
+            else if (scoreB >= raceGoalB) {
+                if (currentMode === '3-3-1 驟死賽') handleSetWin('B');
+                else showWinner(document.getElementById('displayNameB').innerText);
+            }
+        }
+
+        async function handleSetWin(winnerSide) {
+            const winnerName = document.getElementById('displayName' + winnerSide).innerText;
+            pendingSetWinner = winnerName; 
+
+            if (winnerSide === 'A') { currentSetScore.a++; document.getElementById('trophyA').classList.add('show'); } 
+            else { currentSetScore.b++; document.getElementById('trophyB').classList.add('show'); }
+
+            const r = { pA: document.getElementById('displayNameA').innerText, pB: document.getElementById('displayNameB').innerText, winner: winnerName, mode: currentMode, score: `${scoreA}:${scoreB}`, status: "已完賽", customRace: raceGoalA };
+            fetch(GAS_URL, { method: "POST", body: JSON.stringify(r) });
+
+            if (currentSetScore.a >= 2 || currentSetScore.b >= 2) {
+                await showWinner(winnerName);
+            } else {
+                document.getElementById('setWinMsg').innerHTML = `<span class="text-blue-300">${winnerName}</span> 拿下本盤！<br><span class="text-lg text-slate-400 mt-2">目前大比分：${currentSetScore.a} - ${currentSetScore.b}</span>`;
+                document.getElementById('setWinOverlay').style.display = 'flex';
+            }
+        }
+
+        function nextSetAction() {
+            document.getElementById('setWinOverlay').style.display = 'none';
+            scoreA = 0; scoreB = 0;
+            if (currentSetScore.a === 1 && currentSetScore.b === 1) {
+                raceGoalA = 1; raceGoalB = 1;
+                document.getElementById('raceDisplay').classList.remove('text-blue-500');
+                document.getElementById('raceDisplay').classList.add('text-red-600', 'animate-pulse');
+            } else { raceGoalA = 3; raceGoalB = 3; }
+            document.getElementById('raceDisplay').innerText = raceGoalA;
+            updateVisuals();
+        }
+
+        function updateVisuals() {
+            document.getElementById('scoreA').innerText = scoreA;
+            document.getElementById('scoreB').innerText = scoreB;
+            document.getElementById('scoreA').classList.toggle('on-the-hill', scoreA === raceGoalA - 1);
+            document.getElementById('scoreB').classList.toggle('on-the-hill', scoreB === raceGoalB - 1);
+        }
+
+        async function showWinner(name) {
+            document.getElementById('winnerLabel').innerText = name;
+            document.getElementById('winOverlay').style.display = 'flex';
+            if (currentMode !== '3-3-1 驟死賽') {
+                const r = { pA: document.getElementById('displayNameA').innerText, pB: document.getElementById('displayNameB').innerText, winner: name, mode: currentMode, score: `${scoreA}:${scoreB}`, status: "已完賽", customRace: raceGoalA };
+                await fetch(GAS_URL, { method: "POST", body: JSON.stringify(r) });
+            }
+        }
+
+        async function saveProgress() {
+            const btn = document.getElementById('mainSaveBtn'); btn.innerText = "儲存中...";
+            const r = { pA: document.getElementById('displayNameA').innerText, pB: document.getElementById('displayNameB').innerText, mode: currentMode, score: `${scoreA}:${scoreB}`, status: "未完賽", customRace: raceGoalA, customRaceB: raceGoalB };
+            await fetch(GAS_URL, { method: "POST", body: JSON.stringify(r) });
+            btn.innerText = "儲存成功"; setTimeout(() => btn.innerText = "儲存目前進度", 2000);
+        }
+    </script>
+</body>
+</html>
